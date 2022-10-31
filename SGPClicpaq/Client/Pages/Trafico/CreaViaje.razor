@@ -1,0 +1,285 @@
+﻿@page "/creaviaje"
+@using System.Text.Json
+
+<div class="container-fluid"> 
+
+
+    <RadzenSteps  Change=@OnChange>
+        <Steps>
+            <RadzenStepsItem Text="Agregar guías">
+                <RadzenText TextStyle="TextStyle.H5" TagName="TagName.H3" Class="my-4">1. Elegir guias</RadzenText>
+                <EditForm Model="@guia">
+                    <InputNumber class="form-control" @bind-Value="@guia" ></InputNumber>
+                </EditForm>
+                <br />
+                <button class="btn btn-outline-success" @onclick="addGuia">Agregar guia</button>
+            </RadzenStepsItem>
+            <RadzenStepsItem Text="Chofer" Disabled="@(guiasList.Count == 0)">
+                <RadzenText TextStyle="TextStyle.H5" TagName="TagName.H3" Class="my-4">2. Elegir chofer</RadzenText>
+                <RadzenDropDown TValue="string" AllowClear="true" AllowFiltering="true" FilterCaseSensitivity="FilterCaseSensitivity.CaseInsensitive"
+                                @bind-Value="oViaje.Chofer" Data=@obj1 ValueProperty="Nombre" TextProperty="Nombre" 
+                                Class="w-100">
+                    <Template>
+                        @($"{context.Nombre} {context.Apellido}")
+                    </Template>
+                </RadzenDropDown>                
+            </RadzenStepsItem>
+            <RadzenStepsItem Text="Dominio" Disabled="@(guiasList.Count == 0)">
+                <RadzenText TextStyle="TextStyle.H5" TagName="TagName.H3" Class="my-4">3. Elegir dominio</RadzenText>
+                <RadzenDropDown AllowClear="true" TValue="string" AllowVirtualization="true" Class="w-50" FilterCaseSensitivity="FilterCaseSensitivity.CaseInsensitive"
+                                AllowFiltering="true" Data=@obj2 TextProperty="Dominio" ValueProperty="Dominio" @bind-Value="oViaje.Unidad"
+                                 />
+            </RadzenStepsItem>
+            <RadzenStepsItem Text="Zona de destino" Disabled="@(guiasList.Count == 0)">
+                <RadzenText TextStyle="TextStyle.H5" TagName="TagName.H3" Class="my-4">4. Elegir la zona de destino</RadzenText>
+                <EditForm Model="@oViaje">
+                    <InputText class="form-control" @bind-Value="@oViaje.ZonaDestino"></InputText>
+                </EditForm>
+            </RadzenStepsItem>
+            <RadzenStepsItem Text="Fecha del viaje" Disabled="@(guiasList.Count == 0)">
+                <RadzenText TextStyle="TextStyle.H5" TagName="TagName.H3" Class="my-4">5. Elegir la fecha del viaje</RadzenText>
+                <EditForm Model="@oViaje">
+                    <RadzenDatePicker TValue="DateTime?" @bind-Value="@oViaje.FechaViaje" Min="DateTime.Today" ShowTime="false" ShowSeconds="false" DateFormat="dd/MM/yyyy" Class="w-50" />
+                </EditForm>
+            </RadzenStepsItem>
+            <RadzenStepsItem Text="Observaciones" Disabled="@(guiasList.Count == 0)">
+                <RadzenText TextStyle="TextStyle.H5" TagName="TagName.H3" Class="my-4">6. Observaciones (opcional)</RadzenText>
+                <EditForm Model="@oViaje">
+                    <InputText class="form-control" @bind-Value="@oViaje.Observaciones"></InputText>
+                </EditForm>
+            </RadzenStepsItem>
+            <RadzenStepsItem Text="Éxito">
+            </RadzenStepsItem>
+        </Steps>
+    </RadzenSteps>
+
+    <div class="col-lg-6 col-xl-4 offset-lg-3 offset-xl-4">
+        <RadzenCard Class="m-3">
+            <div class="d-flex flex-row p-3">
+                <div>
+                    <RadzenText TextStyle="TextStyle.Overline" Class="d-flex mt-1 mb-0">Guías cargadas</RadzenText>
+                    <RadzenText TextStyle="TextStyle.Body1">
+                        <b>
+                            @foreach (var a in guiasList)
+                            {
+                                @a
+                                <a>&nbsp;</a>
+                            }
+                        </b>
+                    </RadzenText>
+                    <RadzenText TextStyle="TextStyle.Overline" Class="d-flex mt-3 mb-0">Total guía</RadzenText>
+                    <RadzenText TextStyle="TextStyle.Body1"><b>@totalGuias</b></RadzenText>
+                    <RadzenText TextStyle="TextStyle.Overline" Class="d-flex mt-3 mb-0">Total bultos</RadzenText>
+                    <RadzenText TextStyle="TextStyle.Body1"><b>@totalBultos</b></RadzenText>
+                    <RadzenText TextStyle="TextStyle.Overline" Class="d-flex mt-3 mb-0">Total volumen</RadzenText>
+                    <RadzenText TextStyle="TextStyle.Body1"><b>@totalVolumen</b></RadzenText>
+                    <RadzenText TextStyle="TextStyle.Overline" Class="d-flex mt-3 mb-0">Total peso</RadzenText>
+                    <RadzenText TextStyle="TextStyle.Body1"><b>@totalPeso</b></RadzenText>
+                </div>
+            </div>
+        </RadzenCard>
+    </div>
+</div>
+
+@code {
+    List<Chofer> obj1 = new();
+    List<Movil> obj2 = new();
+    Respuesta<List<Chofer>> oRtaChofer = new();
+    Respuesta<List<Movil>> oRtaMovil = new();
+    Respuesta<Viaje> oRespuesta = new();
+    int guia;
+    List<int> guiasList = new();
+    string guiasString;
+    int totalGuias;
+    int totalBultos;
+    int totalVolumen;
+    int totalPeso;
+
+    Viaje oViaje = new();
+
+    public async Task OnChange(int index)
+    {
+        if (index == 6)
+        {
+            await alertaAgregar();
+            nav.NavigateTo("/viajes");
+        }
+    }
+    protected override async Task OnInitializedAsync()
+    {
+        var rta1 = await http.GetFromJsonAsync<Respuesta<List<Chofer>>>("/api/chofer");
+        oRtaChofer = rta1;
+        obj1 = rta1.List;
+        var rta2 = await http.GetFromJsonAsync<Respuesta<List<Movil>>>("/api/movil");
+        oRtaMovil = rta2;
+        obj2 = rta2.List;
+    }
+
+
+    async Task OnSubmit()
+    {
+        guiasString = JsonSerializer.Serialize<List<int>>(guiasList); 
+        
+        oViaje.Guias = guiasString;
+
+        oViaje.TimeGenerado = DateTime.Now;
+        oViaje.Estado = 1;
+        oViaje.Sucursal = 3;
+        oViaje.TotalBultos = totalBultos;
+        oViaje.TotalGuias = totalGuias;
+        oViaje.TotalVolumen = totalVolumen;
+        oViaje.TotalPeso = totalPeso;
+
+        var response = await http.PostAsJsonAsync<Viaje>("api/viaje", oViaje);
+
+        oViaje = new();
+        totalGuias = 0;
+        totalBultos = 0;
+        totalVolumen = 0;
+        totalPeso = 0;
+        guia = 0;
+        guiasList = new();
+        guiasString = "";
+        oRespuesta = await response.Content.ReadFromJsonAsync<Respuesta<Viaje>>();
+        ShowNotification(new NotificationMessage
+            {
+                Style = "position: right;",
+                Severity = NotificationSeverity.Success,
+                Summary = $"Se cargó el viaje {oRespuesta.List.Id}",
+                Detail = "Success",
+                Duration = 40000
+            });
+    }
+
+    async Task addGuia()
+    {
+        var oRta = await http.GetFromJsonAsync<Respuesta<Guium>>($"/api/guia/{guia}");
+
+        if (oRta.Exito == 1)
+        {
+
+            if (!guiasList.Contains(guia) && oRta.List.Idsucursal == 3)  //&& oRta.List.Anula == 0
+            {
+                guiasList.Add(guia);
+                totalGuias = totalGuias + 1;
+                totalBultos = totalBultos + (int)oRta.List.Bulto;
+                totalVolumen = totalVolumen + (int)oRta.List.Volumen;
+                totalPeso = totalPeso + (int)oRta.List.Peso;
+                ShowNotification(new NotificationMessage
+                    {
+                        Style = "position: right;",
+                        Severity = NotificationSeverity.Success,
+                        Summary = $"Se agrego la guia {guia} a la lista",
+                        Detail = "Success",
+                        Duration = 4000
+                    });
+            }
+            else if (oRta.List.Idsucursal != 3)
+            {
+                ShowNotification(new NotificationMessage
+                    {
+                        Style = "position: right;",
+                        Severity = NotificationSeverity.Error,
+                        Summary = $"La guia {guia} no pertenece a esta sucursal",
+                        Detail = "Success",
+                        Duration = 4000
+                    });
+            }
+            //else if (oRta.List.Anula == 1)
+            //{
+            //    ShowNotification(new NotificationMessage
+            //        {
+            //            Style = "position: right;",
+            //            Severity = NotificationSeverity.Error,
+            //            Summary = $"La guia {guia} esta anulada",
+            //            Detail = "",
+            //            Duration = 4000
+            //        });
+            //}
+            //else if (oRta.List.Anula == 2)
+            //{
+            //    ShowNotification(new NotificationMessage
+            //        {
+            //            Style = "position: right;",
+            //            Severity = NotificationSeverity.Error,
+            //            Summary = $"La guia {guia} ya salio del sistema",
+            //            Detail = "",
+            //            Duration = 4000
+            //        });
+            //}
+            //else if (oRta.List.Anula == 3)
+            //{
+            //    ShowNotification(new NotificationMessage
+            //        {
+            //            Style = "position: right;",
+            //            Severity = NotificationSeverity.Error,
+            //            Summary = $"La guia {guia} no esta confirmada",
+            //            Detail = "",
+            //            Duration = 4000
+            //        });
+            //}
+            else if (guiasList.Contains(guia))
+            {
+                ShowNotification(new NotificationMessage
+                    {
+                        Style = "position: right;",
+                        Severity = NotificationSeverity.Error,
+                        Summary = $"La guia {guia} ya esta en la lista",
+                        Detail = "",
+                        Duration = 4000
+                    });
+            }
+            else
+            {
+                ShowNotification(new NotificationMessage
+                    {
+                        Style = "position: right;",
+                        Severity = NotificationSeverity.Error,
+                        Summary = "Hubo un error",
+                        Detail = "",
+                        Duration = 4000
+                    });
+            }
+            StateHasChanged();
+        }
+        else
+        {
+            ShowNotification(new NotificationMessage
+                {
+                    Style = "position: right;",
+                    Severity = NotificationSeverity.Error,
+                    Summary = $"La guia {guia} no existe",
+                    Detail = "",
+                    Duration = 4000
+                });
+        }
+    }
+
+    public async Task alertaAgregar()
+    {
+        SweetAlertResult result = await Swal.FireAsync(new SweetAlertOptions
+            {
+                Title = "¿Está seguro?",
+                Text = "Agregará este viaje",
+                Icon = SweetAlertIcon.Warning,
+                ShowCancelButton = true,
+                ConfirmButtonText = "Confirmar",
+                CancelButtonText = "Cancelar"
+            });
+
+        if (!string.IsNullOrEmpty(result.Value))
+        {
+            await OnSubmit();
+
+        }
+        else if (result.Dismiss == DismissReason.Cancel)
+        {
+
+        }
+    }
+    void ShowNotification(NotificationMessage message)
+    {
+        NotificationService.Notify(message);
+
+    }
+}
